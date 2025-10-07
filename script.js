@@ -38,7 +38,7 @@ function handleCredentialResponse(response){
   profile = parseJwt(response.credential);
   localStorage.setItem('google_profile', JSON.stringify(profile));
   updateUserIcon();
-  if(tokenClient) tokenClient.requestAccessToken({prompt: ''});
+  if(tokenClient) tokenClient.requestAccessToken({prompt:''});
 }
 
 // ---------------- Load GAPI ----------------
@@ -47,15 +47,18 @@ function gapiLoaded() {
 }
 
 async function initGapiClient(){
-  await gapi.client.init({
-    apiKey: '',
-    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
-  });
-  const savedToken = localStorage.getItem('google_access_token');
-  if(savedToken){
-    accessToken = savedToken;
-    loadNotes();
-  }
+  try{
+    await gapi.client.init({
+      apiKey: '',
+      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
+    });
+
+    const savedToken = localStorage.getItem('google_access_token');
+    if(savedToken){
+      accessToken = savedToken;
+      loadNotes();
+    }
+  }catch(e){ console.log('GAPI init error', e); }
 }
 
 // ---------------- Klik ikon ----------------
@@ -72,78 +75,95 @@ function gisLoaded(){
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: (resp)=>{
+    callback: async (resp)=>{
+      if(resp.error){
+        console.log('Token error', resp);
+        return;
+      }
       accessToken = resp.access_token;
       localStorage.setItem('google_access_token', accessToken);
-      loadNotes();
+      await loadNotes();
     }
   });
 }
 
 // ---------------- Drive ----------------
 async function createFolder(){ 
-  const res = await gapi.client.drive.files.list({ 
-    q:`name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false`, 
-    fields:'files(id)' 
-  });
-  if(res.result.files?.length) return res.result.files[0].id;
+  try{
+    const res = await gapi.client.drive.files.list({ 
+      q:`name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false`, 
+      fields:'files(id)' 
+    });
+    if(res.result.files?.length) return res.result.files[0].id;
 
-  const folder = await gapi.client.drive.files.create({ 
-    resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
-    fields:'id' 
-  });
-  return folder.result.id;
+    const folder = await gapi.client.drive.files.create({ 
+      resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
+      fields:'id' 
+    });
+    return folder.result.id;
+  }catch(e){ console.log('Create folder error', e); }
 }
 
 async function saveNote(text){
-  if(!profile) { google.accounts.id.prompt(); return; }
-  if(!accessToken) { tokenClient.requestAccessToken({prompt:'consent'}); return; }
+  if(!profile){ google.accounts.id.prompt(); return; }
+  if(!accessToken){ tokenClient.requestAccessToken({prompt:'consent'}); return; }
 
-  const folderId = await createFolder();
-  const blob = new Blob([text], {type:'text/plain'});
-  const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folderId] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
-  form.append('file', blob);
+  try{
+    const folderId = await createFolder();
+    const blob = new Blob([text], {type:'text/plain'});
+    const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folderId] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
+    form.append('file', blob);
 
-  await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-    method:'POST',
-    headers:{'Authorization':'Bearer '+accessToken},
-    body:form
-  });
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+accessToken},
+      body:form
+    });
 
-  await loadNotes();
+    await loadNotes();
+
+    // Popup sukses
+    alert('✅ Catatanmu berhasil tersimpan!');
+    
+  }catch(e){ 
+    console.log('Save note error', e); 
+    alert('⚠️ Gagal menyimpan catatan, coba lagi.');
+  }
 }
 
 // ---------------- Load catatan ----------------
 async function loadNotes(){
   if(!profile || !accessToken) return;
 
-  const folderId = await createFolder();
-  const res = await gapi.client.drive.files.list({
-    q:`'${folderId}' in parents and trashed=false`,
-    fields:'files(id,name,createdTime)'
-  });
+  try{
+    const folderId = await createFolder();
+    const res = await gapi.client.drive.files.list({
+      q:`'${folderId}' in parents and trashed=false`,
+      fields:'files(id,name,createdTime)'
+    });
 
-  entriesList.innerHTML='';
-  if(!res.result.files?.length){ 
-    entriesList.innerHTML='<li style="color:#555">Belum ada catatan.</li>'; 
-    return; 
-  }
+    entriesList.innerHTML='';
+    if(!res.result.files?.length){ 
+      entriesList.innerHTML='<li style="color:#555">Belum ada catatan.</li>'; 
+      return; 
+    }
 
-  const files = res.result.files.sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime));
-  for(const file of files){
-    try{
-      const contentRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
-        headers:{'Authorization':'Bearer '+accessToken}
-      });
-      const text = await contentRes.text();
-      const li = document.createElement('li');
-      li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
-      li.title = text;
-      entriesList.appendChild(li);
-    }catch(e){ console.log(e); }
-  }
+    const files = res.result.files.sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime));
+    for(const file of files){
+      try{
+        const contentRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+          headers:{'Authorization':'Bearer '+accessToken}
+        });
+        const text = await contentRes.text();
+        const li = document.createElement('li');
+        li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
+        li.title = text;
+        entriesList.appendChild(li);
+      }catch(e){ console.log('Load file error', e); }
+    }
+  }catch(e){ console.log('Load notes error', e); }
 }
 
 // ---------------- Form submit ----------------
