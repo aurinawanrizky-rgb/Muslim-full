@@ -116,13 +116,21 @@ async function listNotes() {
     return;
   }
 
-  res.result.files
-    .sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime))
-    .forEach(file=>{
+  const files = res.result.files.sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime));
+
+  for(const file of files){
+    try{
+      const contentRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+        headers: { 'Authorization': 'Bearer ' + accessToken }
+      });
+      const text = await contentRes.text();
       const li = document.createElement('li');
-      li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${file.name}`;
+      li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
       entriesList.appendChild(li);
-    });
+    }catch(err){
+      console.log('Gagal ambil isi catatan:', err);
+    }
+  }
 }
 
 // -------------------- Form Submit --------------------
