@@ -10,6 +10,11 @@ const reflectionInput = document.getElementById('reflection');
 const entriesList = document.getElementById('entriesList');
 const userIcon = document.getElementById('userIcon');
 
+const viewNotesBtn = document.getElementById('viewNotesBtn');
+const backBtn = document.getElementById('backBtn');
+const logSection = document.querySelector('.log-section');
+const entriesSection = document.getElementById('entriesSection');
+
 // ---------------- Parse JWT ----------------
 function parseJwt(token) {
   const base64Url = token.split('.')[1];
@@ -159,7 +164,7 @@ async function loadNotes(){
         const text = await contentRes.text();
         const li = document.createElement('li');
         li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
-        li.title = text;
+        li.title = text; // tooltip full text
         entriesList.appendChild(li);
       }catch(e){ console.log('Load file error', e); }
     }
@@ -173,6 +178,28 @@ logForm.addEventListener('submit', async e=>{
   if(!text) return;
   await saveNote(text);
   reflectionInput.value='';
+});
+
+// ---------------- Tombol Catatan Sebelumnya ----------------
+viewNotesBtn.addEventListener('click', async () => {
+  if(!profile){ 
+    google.accounts.id.prompt(); 
+    return;
+  }
+  if(!accessToken){ 
+    tokenClient.requestAccessToken({prompt:'consent'}); 
+    return;
+  }
+
+  logSection.style.display = 'none';
+  entriesSection.style.display = 'block';
+
+  await loadNotes();
+});
+
+backBtn.addEventListener('click', () => {
+  entriesSection.style.display = 'none';
+  logSection.style.display = 'block';
 });
 
 // ---------------- On load ----------------
