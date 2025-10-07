@@ -38,7 +38,6 @@ function handleCredentialResponse(response){
   profile = parseJwt(response.credential);
   localStorage.setItem('google_profile', JSON.stringify(profile));
   updateUserIcon();
-  // Ambil token Drive setelah profile siap
   if(tokenClient) tokenClient.requestAccessToken({prompt: ''});
 }
 
@@ -62,7 +61,7 @@ async function initGapiClient(){
 // ---------------- Klik ikon ----------------
 userIcon.addEventListener('click', ()=>{
   if(!profile){
-    google.accounts.id.prompt(); // popup login
+    google.accounts.id.prompt(); 
   } else if(!accessToken){
     tokenClient.requestAccessToken({prompt:'consent'});
   }
@@ -141,7 +140,7 @@ async function loadNotes(){
       const text = await contentRes.text();
       const li = document.createElement('li');
       li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
-      li.title = text; // hover untuk lihat full note
+      li.title = text;
       entriesList.appendChild(li);
     }catch(e){ console.log(e); }
   }
