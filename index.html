@@ -22,13 +22,18 @@
       <h2>Tulis Refleksi Hari Ini</h2>
       <form id="logForm">
         <textarea id="reflection" placeholder="Apa yang kamu pelajari hari ini?" required></textarea>
-        <button type="submit">Simpan</button>
+        <div style="margin-top:10px; display:flex; gap:10px;">
+          <button type="submit">Simpan</button>
+          <button type="button" id="viewNotesBtn">Catatan Sebelumnya</button>
+        </div>
       </form>
     </section>
 
-    <section class="entries-section">
+    <!-- Section catatan sebelumnya bisa disembunyikan default -->
+    <section class="entries-section" id="entriesSection" style="display:none;">
       <h2>Catatan Sebelumnya</h2>
       <ul id="entriesList"></ul>
+      <button id="backBtn" style="margin-top:10px;">Kembali</button>
     </section>
   </main>
 
