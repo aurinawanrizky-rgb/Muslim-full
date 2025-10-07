@@ -4,6 +4,7 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let profile = null;
 let accessToken = null;
 let tokenClient = null;
+let folderIdCache = null;
 
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
@@ -17,14 +18,9 @@ const entriesSection = document.getElementById('entriesSection');
 
 // ---------------- Parse JWT ----------------
 function parseJwt(token) {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(base64));
-  } catch(e) {
-    console.log('JWT parse error', e);
-    return null;
-  }
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  return JSON.parse(atob(base64));
 }
 
 // ---------------- Update ikon ----------------
@@ -46,11 +42,9 @@ function updateUserIcon(){
 // ---------------- GIS callback ----------------
 function handleCredentialResponse(response){
   profile = parseJwt(response.credential);
-  if(profile){
-    localStorage.setItem('google_profile', JSON.stringify(profile));
-    updateUserIcon();
-    if(tokenClient) tokenClient.requestAccessToken({prompt:''});
-  }
+  localStorage.setItem('google_profile', JSON.stringify(profile));
+  updateUserIcon();
+  if(tokenClient) tokenClient.requestAccessToken({prompt:''});
 }
 
 // ---------------- Load GAPI ----------------
@@ -100,12 +94,9 @@ function gisLoaded(){
   });
 }
 
-// ---------------- Drive ----------------
-async function createFolder(){ 
-  if(!accessToken){
-    alert('⚠️ Access token belum tersedia, login dulu.');
-    return null;
-  }
+// ---------------- Folder ----------------
+async function getFolderId() {
+  if(folderIdCache) return folderIdCache;
 
   try {
     const res = await gapi.client.drive.files.list({ 
@@ -113,27 +104,33 @@ async function createFolder(){
       fields:'files(id)' 
     });
 
-    if(res.result.files?.length) return res.result.files[0].id;
+    if(res.result.files?.length){
+      folderIdCache = res.result.files[0].id;
+      return folderIdCache;
+    }
 
+    // Buat folder baru jika belum ada
     const folder = await gapi.client.drive.files.create({ 
       resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
       fields:'id' 
     });
+    folderIdCache = folder.result.id;
+    return folderIdCache;
 
-    return folder.result.id;
   } catch(e){ 
-    console.log('Create folder error', e); 
-    alert('⚠️ Gagal membuat folder di Google Drive');
+    console.log('Folder error', e);
+    alert('⚠️ Gagal akses folder di Google Drive');
     return null;
   }
 }
 
+// ---------------- Save note ----------------
 async function saveNote(text){
   if(!profile){ google.accounts.id.prompt(); return; }
   if(!accessToken){ tokenClient.requestAccessToken({prompt:'consent'}); return; }
 
   try{
-    const folderId = await createFolder();
+    const folderId = await getFolderId();
     if(!folderId) return;
 
     const blob = new Blob([text], {type:'text/plain'});
@@ -150,18 +147,19 @@ async function saveNote(text){
 
     await loadNotes();
     alert('✅ Catatanmu berhasil tersimpan!');
-
-  } catch(e){ 
+    
+  }catch(e){ 
     console.log('Save note error', e); 
     alert('⚠️ Gagal menyimpan catatan, coba lagi.');
   }
 }
 
+// ---------------- Load notes ----------------
 async function loadNotes(){
   if(!profile || !accessToken) return;
 
   try{
-    const folderId = await createFolder();
+    const folderId = await getFolderId();
     if(!folderId) return;
 
     const res = await gapi.client.drive.files.list({
@@ -184,7 +182,7 @@ async function loadNotes(){
         const text = await contentRes.text();
         const li = document.createElement('li');
         li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text.substring(0,100)}${text.length>100?'...':''}`;
-        li.title = text; // tooltip full text
+        li.title = text;
         entriesList.appendChild(li);
       }catch(e){ console.log('Load file error', e); alert('⚠️ Load file error'); }
     }
@@ -235,6 +233,7 @@ window.onload = ()=>{
     client_id: CLIENT_ID,
     callback: handleCredentialResponse
   });
+  google.accounts.id.renderButton(document.createElement('div'), { theme:'outline', size:'small' });
 
   gisLoaded();
 };
