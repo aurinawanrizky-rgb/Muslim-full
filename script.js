@@ -1,5 +1,3 @@
-// script.js
-
 const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com'; // ganti dengan Client ID Google-mu
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
@@ -10,7 +8,7 @@ let pendingNote = null;
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
 const entriesList = document.getElementById('entriesList');
-const loginStatus = document.getElementById('loginStatus');
+const loginStatus = document.createElement('p'); // optional, bisa taruh di bawah form
 const userIcon = document.getElementById('userIcon');
 
 // -------------------- Google API Init --------------------
@@ -37,17 +35,16 @@ function gisLoaded() {
 async function handleTokenResponse(resp) {
   if (resp.error) throw resp;
   accessToken = resp.access_token;
-  loginStatus.textContent = 'Login berhasil!';
 
   try {
     const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     });
     const profile = await profileRes.json();
-    userIcon.src = profile.picture;
+    userIcon.src = profile.picture; // ganti ikon jadi foto profil Google
   } catch (err) {
     console.log('Gagal ambil foto user:', err);
-    userIcon.src = 'https://via.placeholder.com/40?text=!'; // fallback tanda seru
+    userIcon.src = 'https://via.placeholder.com/40/FFFFFF/000000?text=%21'; // fallback tanda seru
   }
 
   await savePendingNote();
@@ -130,7 +127,7 @@ logForm.addEventListener('submit', async (e)=>{
     tokenClient.requestAccessToken({ prompt: 'consent' });
 
     // ubah ikon jadi tanda seru saat menunggu login
-    userIcon.src = 'https://via.placeholder.com/40?text=!';
+    userIcon.src = 'https://via.placeholder.com/40/FFFFFF/000000?text=%21';
   }
 
   reflectionInput.value = '';
