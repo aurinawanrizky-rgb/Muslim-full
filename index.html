@@ -1,33 +1,47 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Muslim full - Daily Reflection</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://apis.google.com/js/api.js"></script>
+  
+  <!-- Google API & GIS -->
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  
 </head>
 <body>
   <header>
     <h1>🕋 Muslim full</h1>
     <p>Catatan refleksi harian Islami</p>
-  </header>  <main>
+  </header>
+
+  <main>
     <section class="login-section">
       <button id="loginGoogle">Login dengan Google</button>
       <p id="loginStatus"></p>
-    </section><section class="log-section" style="display:none;">
-  <h2>Tulis Refleksi Hari Ini</h2>
-  <form id="logForm">
-    <textarea id="reflection" placeholder="Apa yang kamu pelajari hari ini?" required></textarea>
-    <button type="submit">Simpan</button>
-  </form>
-</section>
+    </section>
 
-<section class="entries-section" style="display:none;">
-  <h2>Catatan Sebelumnya</h2>
-  <ul id="entriesList"></ul>
-</section>
+    <section class="log-section" style="display:none;">
+      <h2>Tulis Refleksi Hari Ini</h2>
+      <form id="logForm">
+        <textarea id="reflection" placeholder="Apa yang kamu pelajari hari ini?" required></textarea>
+        <button type="submit">Simpan</button>
+      </form>
+    </section>
 
-  </main>  <footer>
+    <section class="entries-section" style="display:none;">
+      <h2>Catatan Sebelumnya</h2>
+      <ul id="entriesList"></ul>
+    </section>
+  </main>
+
+  <footer>
     <p>❤️ Dibuat untuk mengingat Allah dalam setiap langkah</p>
-  </footer>  <script src="script.js"></script></body>
+  </footer>
+
+  <!-- Script JS -->
+  <script src="script.js"></script>
+</body>
 </html>
