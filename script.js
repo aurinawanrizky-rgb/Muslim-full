@@ -1,4 +1,4 @@
-const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com'; // ganti dengan client ID-mu
+const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com'; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let profile = null;
@@ -61,7 +61,7 @@ async function initGapiClient(){
     const savedToken = localStorage.getItem('google_access_token');
     if(savedToken){
       accessToken = savedToken;
-      loadNotes();
+      await loadNotes();
     }
   }catch(e){ console.log('GAPI init error', e); }
 }
@@ -129,9 +129,7 @@ async function saveNote(text){
 
     await loadNotes();
 
-    // Popup sukses
     alert('✅ Catatanmu berhasil tersimpan!');
-    
   }catch(e){ 
     console.log('Save note error', e); 
     alert('⚠️ Gagal menyimpan catatan, coba lagi.');
@@ -164,7 +162,10 @@ async function loadNotes(){
         const text = await contentRes.text();
         const li = document.createElement('li');
         li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
-        li.title = text; // tooltip full text
+        li.title = text; 
+        li.style.maxHeight = '60px';
+        li.style.overflow = 'hidden';
+        li.style.textOverflow = 'ellipsis';
         entriesList.appendChild(li);
       }catch(e){ console.log('Load file error', e); }
     }
