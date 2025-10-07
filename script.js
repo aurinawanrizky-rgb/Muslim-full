@@ -1,6 +1,6 @@
 // script.js
 
-const CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
+const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let tokenClient;
