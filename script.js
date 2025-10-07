@@ -41,6 +41,7 @@ function updateUserIcon(){
 // ---------------- GIS callback ----------------
 function handleCredentialResponse(response){
   profile = parseJwt(response.credential);
+  console.log('Logged in profile:', profile);
   localStorage.setItem('google_profile', JSON.stringify(profile));
   updateUserIcon();
   if(tokenClient) tokenClient.requestAccessToken({prompt:''});
@@ -57,13 +58,15 @@ async function initGapiClient(){
       apiKey: '',
       discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
     });
+    console.log('GAPI initialized');
 
     const savedToken = localStorage.getItem('google_access_token');
     if(savedToken){
       accessToken = savedToken;
+      console.log('Saved access token found:', accessToken);
       await loadNotes();
     }
-  }catch(e){ console.log('GAPI init error', e); }
+  }catch(e){ console.error('GAPI init error', e); }
 }
 
 // ---------------- Klik ikon ----------------
@@ -82,10 +85,11 @@ function gisLoaded(){
     scope: SCOPES,
     callback: async (resp)=>{
       if(resp.error){
-        console.log('Token error', resp);
+        console.error('Token error', resp);
         return;
       }
       accessToken = resp.access_token;
+      console.log('New access token:', accessToken);
       localStorage.setItem('google_access_token', accessToken);
       await loadNotes();
     }
@@ -99,14 +103,18 @@ async function createFolder(){
       q:`name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false`, 
       fields:'files(id)' 
     });
-    if(res.result.files?.length) return res.result.files[0].id;
+    if(res.result.files?.length){
+      console.log('Folder exists:', res.result.files[0].id);
+      return res.result.files[0].id;
+    }
 
     const folder = await gapi.client.drive.files.create({ 
       resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
       fields:'id' 
     });
+    console.log('Folder created:', folder.result.id);
     return folder.result.id;
-  }catch(e){ console.log('Create folder error', e); }
+  }catch(e){ console.error('Create folder error', e); }
 }
 
 async function saveNote(text){
@@ -115,24 +123,28 @@ async function saveNote(text){
 
   try{
     const folderId = await createFolder();
+    console.log('Saving note in folder:', folderId);
+    
     const blob = new Blob([text], {type:'text/plain'});
     const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folderId] };
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
     form.append('file', blob);
 
-    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
       method:'POST',
       headers:{'Authorization':'Bearer '+accessToken},
       body:form
     });
+    console.log('Upload response:', res);
 
     await loadNotes();
 
     alert('✅ Catatanmu berhasil tersimpan!');
+    
   }catch(e){ 
-    console.log('Save note error', e); 
-    alert('⚠️ Gagal menyimpan catatan, coba lagi.');
+    console.error('Save note error', e); 
+    alert('⚠️ Gagal menyimpan catatan, cek console.');
   }
 }
 
@@ -142,6 +154,8 @@ async function loadNotes(){
 
   try{
     const folderId = await createFolder();
+    console.log('Loading notes from folder:', folderId);
+
     const res = await gapi.client.drive.files.list({
       q:`'${folderId}' in parents and trashed=false`,
       fields:'files(id,name,createdTime)'
@@ -163,13 +177,10 @@ async function loadNotes(){
         const li = document.createElement('li');
         li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
         li.title = text; 
-        li.style.maxHeight = '60px';
-        li.style.overflow = 'hidden';
-        li.style.textOverflow = 'ellipsis';
         entriesList.appendChild(li);
-      }catch(e){ console.log('Load file error', e); }
+      }catch(e){ console.error('Load file error', e); }
     }
-  }catch(e){ console.log('Load notes error', e); }
+  }catch(e){ console.error('Load notes error', e); }
 }
 
 // ---------------- Form submit ----------------
