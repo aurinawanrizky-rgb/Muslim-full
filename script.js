@@ -3,7 +3,6 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let tokenClient;
 let accessToken = null;
-let pendingNote = null;
 
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
@@ -22,6 +21,7 @@ async function initializeGapiClient() {
   });
 }
 
+// -------------------- GIS Init --------------------
 function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -34,6 +34,15 @@ function gisLoaded() {
 async function handleTokenResponse(resp) {
   if (resp.error) throw resp;
   accessToken = resp.access_token;
+  localStorage.setItem('google_access_token', accessToken); // simpan token
+
+  await fetchUserProfile();
+  await listNotes();
+}
+
+// -------------------- Ambil profil user --------------------
+async function fetchUserProfile() {
+  if (!accessToken) return;
 
   try {
     const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -41,7 +50,7 @@ async function handleTokenResponse(resp) {
     });
     const profile = await profileRes.json();
 
-    // Ganti emoji dengan foto profil
+    // tampilkan foto profil di ikon
     userIcon.innerHTML = '';
     const img = document.createElement('img');
     img.src = profile.picture;
@@ -49,16 +58,13 @@ async function handleTokenResponse(resp) {
     img.style.height = '40px';
     img.style.borderRadius = '50%';
     userIcon.appendChild(img);
-
   } catch (err) {
     console.log('Gagal ambil foto user:', err);
-    userIcon.textContent = '❗'; // fallback tanda seru
+    userIcon.textContent = '❓';
   }
-
-  await savePendingNote();
 }
 
-// -------------------- Save note functions --------------------
+// -------------------- Drive note functions --------------------
 async function createOrGetFolder() {
   const folderName = 'MuslimFullNotes';
   const res = await gapi.client.drive.files.list({
@@ -69,10 +75,7 @@ async function createOrGetFolder() {
     return res.result.files[0].id;
   } else {
     const folder = await gapi.client.drive.files.create({
-      resource: {
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder'
-      },
+      resource: { name: folderName, mimeType: 'application/vnd.google-apps.folder' },
       fields: 'id'
     });
     return folder.result.id;
@@ -128,34 +131,36 @@ logForm.addEventListener('submit', async (e)=>{
   const text = reflectionInput.value.trim();
   if (!text) return;
 
-  if (accessToken) {
-    await saveNoteToDrive(text);
-  } else {
-    pendingNote = text;
+  if (!accessToken) {
     tokenClient.requestAccessToken({ prompt: 'consent' });
-
-    // ubah ikon sementara menjadi tanda seru
-    userIcon.textContent = '❗';
-    userIcon.innerHTML = '';
+    return;
   }
 
+  await saveNoteToDrive(text);
   reflectionInput.value = '';
 });
 
-// -------------------- Save pending note setelah login --------------------
-async function savePendingNote() {
-  if (pendingNote) {
-    await saveNoteToDrive(pendingNote);
-    pendingNote = null;
+// -------------------- Klik ikon login --------------------
+userIcon.addEventListener('click', ()=>{
+  if (!accessToken) {
+    tokenClient.requestAccessToken({ prompt: 'consent' });
   }
-}
+});
 
 // -------------------- Init --------------------
-window.onload = () => {
+window.onload = async () => {
   gapiLoaded();
   if (window.google && google.accounts) {
     gisLoaded();
   } else {
     console.log('Google Identity Services belum siap');
+  }
+
+  // restore token dari localStorage
+  const savedToken = localStorage.getItem('google_access_token');
+  if(savedToken){
+    accessToken = savedToken;
+    await fetchUserProfile();
+    await listNotes();
   }
 };
