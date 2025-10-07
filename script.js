@@ -17,13 +17,18 @@ const entriesSection = document.getElementById('entriesSection');
 
 // ---------------- Parse JWT ----------------
 function parseJwt(token) {
-  const base64Url = token.split('.')[1];
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  return JSON.parse(atob(base64));
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch(e) {
+    console.log('JWT parse error', e);
+    return null;
+  }
 }
 
 // ---------------- Update ikon ----------------
-function updateUserIcon() {
+function updateUserIcon(){
   userIcon.innerHTML = '';
   if(profile?.picture){
     const img = document.createElement('img');
@@ -40,13 +45,11 @@ function updateUserIcon() {
 
 // ---------------- GIS callback ----------------
 function handleCredentialResponse(response){
-  try {
-    profile = parseJwt(response.credential);
+  profile = parseJwt(response.credential);
+  if(profile){
     localStorage.setItem('google_profile', JSON.stringify(profile));
     updateUserIcon();
     if(tokenClient) tokenClient.requestAccessToken({prompt:''});
-  } catch(e){
-    console.log('Credential parse error', e);
   }
 }
 
@@ -65,16 +68,15 @@ async function initGapiClient(){
     const savedToken = localStorage.getItem('google_access_token');
     if(savedToken){
       accessToken = savedToken;
-      enableButtons();
-      console.log('Token restored from storage.');
+      loadNotes();
     }
-  }catch(e){ console.log('GAPI init error', e); }
+  }catch(e){ console.log('GAPI init error', e); alert('⚠️ GAPI init error'); }
 }
 
-// ---------------- Tombol user ----------------
+// ---------------- Klik ikon ----------------
 userIcon.addEventListener('click', ()=>{
   if(!profile){
-    google.accounts.id.prompt();
+    google.accounts.id.prompt(); 
   } else if(!accessToken){
     tokenClient.requestAccessToken({prompt:'consent'});
   }
@@ -85,39 +87,45 @@ function gisLoaded(){
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: (resp)=>{
+    callback: async (resp)=>{
       if(resp.error){
         console.log('Token error', resp);
+        alert('⚠️ Token error');
         return;
       }
       accessToken = resp.access_token;
       localStorage.setItem('google_access_token', accessToken);
-      enableButtons();
+      await loadNotes();
     }
   });
 }
 
-// ---------------- Enable tombol ----------------
-function enableButtons(){
-  viewNotesBtn.disabled = false;
-  logForm.querySelector('button[type="submit"]').disabled = false;
-}
-
 // ---------------- Drive ----------------
 async function createFolder(){ 
-  try{
+  if(!accessToken){
+    alert('⚠️ Access token belum tersedia, login dulu.');
+    return null;
+  }
+
+  try {
     const res = await gapi.client.drive.files.list({ 
-      q:`name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false`, 
+      q:"name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false", 
       fields:'files(id)' 
     });
+
     if(res.result.files?.length) return res.result.files[0].id;
 
     const folder = await gapi.client.drive.files.create({ 
       resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
       fields:'id' 
     });
+
     return folder.result.id;
-  }catch(e){ console.log('Create folder error', e); }
+  } catch(e){ 
+    console.log('Create folder error', e); 
+    alert('⚠️ Gagal membuat folder di Google Drive');
+    return null;
+  }
 }
 
 async function saveNote(text){
@@ -126,6 +134,8 @@ async function saveNote(text){
 
   try{
     const folderId = await createFolder();
+    if(!folderId) return;
+
     const blob = new Blob([text], {type:'text/plain'});
     const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folderId] };
     const form = new FormData();
@@ -138,19 +148,22 @@ async function saveNote(text){
       body:form
     });
 
+    await loadNotes();
     alert('✅ Catatanmu berhasil tersimpan!');
-  }catch(e){ 
+
+  } catch(e){ 
     console.log('Save note error', e); 
     alert('⚠️ Gagal menyimpan catatan, coba lagi.');
   }
 }
 
-// ---------------- Load catatan ringkas ----------------
 async function loadNotes(){
   if(!profile || !accessToken) return;
 
   try{
     const folderId = await createFolder();
+    if(!folderId) return;
+
     const res = await gapi.client.drive.files.list({
       q:`'${folderId}' in parents and trashed=false`,
       fields:'files(id,name,createdTime)'
@@ -163,18 +176,19 @@ async function loadNotes(){
     }
 
     const files = res.result.files.sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime));
-
-    files.forEach(file=>{
-      const li = document.createElement('li');
-      li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${file.name.slice(0,30)}...`;
-      li.title = file.name; // tooltip full name
-      entriesList.appendChild(li);
-    });
-
-  }catch(e){ 
-    console.log('Load notes error', e); 
-    alert('⚠️ Load notes error. Check console.'); 
-  }
+    for(const file of files){
+      try{
+        const contentRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+          headers:{'Authorization':'Bearer '+accessToken}
+        });
+        const text = await contentRes.text();
+        const li = document.createElement('li');
+        li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text.substring(0,100)}${text.length>100?'...':''}`;
+        li.title = text; // tooltip full text
+        entriesList.appendChild(li);
+      }catch(e){ console.log('Load file error', e); alert('⚠️ Load file error'); }
+    }
+  }catch(e){ console.log('Load notes error', e); alert('⚠️ Load notes error'); }
 }
 
 // ---------------- Form submit ----------------
@@ -199,6 +213,7 @@ viewNotesBtn.addEventListener('click', async () => {
 
   logSection.style.display = 'none';
   entriesSection.style.display = 'block';
+
   await loadNotes();
 });
 
@@ -213,11 +228,13 @@ window.onload = ()=>{
   if(savedProfile){
     profile = JSON.parse(savedProfile);
     updateUserIcon();
+    gapiLoaded();
   }
 
   google.accounts.id.initialize({
     client_id: CLIENT_ID,
     callback: handleCredentialResponse
   });
+
   gisLoaded();
 };
