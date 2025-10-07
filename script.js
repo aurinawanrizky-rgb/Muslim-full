@@ -14,7 +14,7 @@ const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
 const entriesList = document.getElementById('entriesList');
 
-// Load Google API
+// Load GAPI
 function gapiLoaded() {
   gapi.load('client', initializeGapiClient);
 }
@@ -26,16 +26,26 @@ async function initializeGapiClient() {
   });
 }
 
-// Initialize OAuth
+// Load GIS
 function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: '', // akan handle manual
+    callback: '', // akan kita handle manual
   });
 }
 
-// Login Google
+// Inisialisasi saat window load
+window.onload = () => {
+  gapiLoaded();
+  if (window.google && google.accounts) {
+    gisLoaded();
+  } else {
+    console.log('Google Identity Services belum siap');
+  }
+};
+
+// Tombol login
 loginButton.addEventListener('click', () => {
   tokenClient.callback = async (resp) => {
     if (resp.error !== undefined) throw resp;
@@ -53,7 +63,7 @@ loginButton.addEventListener('click', () => {
   }
 });
 
-// Buat folder jika belum ada
+// Buat folder di Drive jika belum ada
 async function createOrGetFolder() {
   const folderName = 'MuslimFullNotes';
   const res = await gapi.client.drive.files.list({
@@ -94,7 +104,7 @@ async function saveNoteToDrive(text) {
   await listNotes();
 }
 
-// List catatan dari folder
+// Ambil daftar catatan
 async function listNotes() {
   const folderId = await createOrGetFolder();
   const res = await gapi.client.drive.files.list({
@@ -106,7 +116,8 @@ async function listNotes() {
     entriesList.innerHTML = '<li style="color: #555">Belum ada catatan.</li>';
     return;
   }
-  res.result.files.sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime))
+  res.result.files
+    .sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime))
     .forEach(file=>{
       const li = document.createElement('li');
       li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${file.name}`;
@@ -122,10 +133,3 @@ logForm.addEventListener('submit', async (e)=>{
   await saveNoteToDrive(text);
   reflectionInput.value='';
 });
-
-// Load GAPI & GIS
-function startApp(){
-  gapiLoaded();
-  gisLoaded();
-}
-window.onload = startApp;
