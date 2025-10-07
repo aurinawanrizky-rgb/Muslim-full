@@ -1,4 +1,4 @@
-const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com'; 
+const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let profile = null;
@@ -14,6 +14,33 @@ const viewNotesBtn = document.getElementById('viewNotesBtn');
 const backBtn = document.getElementById('backBtn');
 const logSection = document.querySelector('.log-section');
 const entriesSection = document.getElementById('entriesSection');
+
+// ---------------- Toast popup ----------------
+function showToast(message, type='info'){
+  const toast = document.createElement('div');
+  toast.textContent = message;
+  toast.style.position = 'fixed';
+  toast.style.top = '20px';
+  toast.style.right = '20px';
+  toast.style.padding = '10px 15px';
+  toast.style.backgroundColor = type === 'success' ? '#4CAF50' 
+                           : type === 'error' ? '#f44336' 
+                           : '#2196F3';
+  toast.style.color = 'white';
+  toast.style.borderRadius = '5px';
+  toast.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+  toast.style.zIndex = 9999;
+  toast.style.opacity = '0';
+  toast.style.transition = 'opacity 0.3s';
+
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.style.opacity = '1');
+
+  setTimeout(()=>{
+    toast.style.opacity = '0';
+    setTimeout(()=> toast.remove(), 300);
+  }, 3000);
+}
 
 // ---------------- Parse JWT ----------------
 function parseJwt(token) {
@@ -41,9 +68,9 @@ function updateUserIcon(){
 // ---------------- GIS callback ----------------
 function handleCredentialResponse(response){
   profile = parseJwt(response.credential);
-  console.log('Logged in profile:', profile);
   localStorage.setItem('google_profile', JSON.stringify(profile));
   updateUserIcon();
+  showToast('Login berhasil!', 'success');
   if(tokenClient) tokenClient.requestAccessToken({prompt:''});
 }
 
@@ -58,15 +85,14 @@ async function initGapiClient(){
       apiKey: '',
       discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
     });
-    console.log('GAPI initialized');
 
     const savedToken = localStorage.getItem('google_access_token');
     if(savedToken){
       accessToken = savedToken;
-      console.log('Saved access token found:', accessToken);
       await loadNotes();
+      showToast('Catatan dimuat dari Drive', 'info');
     }
-  }catch(e){ console.error('GAPI init error', e); }
+  }catch(e){ showToast('GAPI init error: '+e, 'error'); }
 }
 
 // ---------------- Klik ikon ----------------
@@ -85,12 +111,12 @@ function gisLoaded(){
     scope: SCOPES,
     callback: async (resp)=>{
       if(resp.error){
-        console.error('Token error', resp);
+        showToast('Token error: '+resp.error, 'error');
         return;
       }
       accessToken = resp.access_token;
-      console.log('New access token:', accessToken);
       localStorage.setItem('google_access_token', accessToken);
+      showToast('Token berhasil diterima', 'success');
       await loadNotes();
     }
   });
@@ -103,18 +129,14 @@ async function createFolder(){
       q:`name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false`, 
       fields:'files(id)' 
     });
-    if(res.result.files?.length){
-      console.log('Folder exists:', res.result.files[0].id);
-      return res.result.files[0].id;
-    }
+    if(res.result.files?.length) return res.result.files[0].id;
 
     const folder = await gapi.client.drive.files.create({ 
       resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
       fields:'id' 
     });
-    console.log('Folder created:', folder.result.id);
     return folder.result.id;
-  }catch(e){ console.error('Create folder error', e); }
+  }catch(e){ showToast('Create folder error: '+e, 'error'); }
 }
 
 async function saveNote(text){
@@ -123,28 +145,23 @@ async function saveNote(text){
 
   try{
     const folderId = await createFolder();
-    console.log('Saving note in folder:', folderId);
-    
     const blob = new Blob([text], {type:'text/plain'});
     const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folderId] };
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
     form.append('file', blob);
 
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
       method:'POST',
       headers:{'Authorization':'Bearer '+accessToken},
       body:form
     });
-    console.log('Upload response:', res);
 
     await loadNotes();
-
-    alert('✅ Catatanmu berhasil tersimpan!');
+    showToast('Catatan tersimpan!', 'success');
     
   }catch(e){ 
-    console.error('Save note error', e); 
-    alert('⚠️ Gagal menyimpan catatan, cek console.');
+    showToast('Save note error: '+e, 'error'); 
   }
 }
 
@@ -154,8 +171,6 @@ async function loadNotes(){
 
   try{
     const folderId = await createFolder();
-    console.log('Loading notes from folder:', folderId);
-
     const res = await gapi.client.drive.files.list({
       q:`'${folderId}' in parents and trashed=false`,
       fields:'files(id,name,createdTime)'
@@ -176,11 +191,11 @@ async function loadNotes(){
         const text = await contentRes.text();
         const li = document.createElement('li');
         li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
-        li.title = text; 
+        li.title = text;
         entriesList.appendChild(li);
-      }catch(e){ console.error('Load file error', e); }
+      }catch(e){ showToast('Load file error: '+e, 'error'); }
     }
-  }catch(e){ console.error('Load notes error', e); }
+  }catch(e){ showToast('Load notes error: '+e, 'error'); }
 }
 
 // ---------------- Form submit ----------------
