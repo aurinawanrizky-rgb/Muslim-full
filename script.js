@@ -32,13 +32,15 @@ async function handleTokenResponse(resp){
   accessToken = resp.access_token;
   localStorage.setItem('google_access_token', accessToken);
 
-  await updateUserIcon();
+  await updateUserIcon();  // hanya update ikon, posisi CSS tetap
   await loadNotes();
 }
 
 // ---------------- Update user icon ----------------
 async function updateUserIcon(){
-  userIcon.innerHTML = ''; // bersihkan dulu
+  if(!userIcon) return;
+  userIcon.innerHTML = ''; // bersihkan dulu isi ikon, tapi styling tetap CSS
+
   if(!accessToken){
     userIcon.textContent = '❓';
     return;
@@ -54,22 +56,24 @@ async function updateUserIcon(){
     if(profile.picture){
       el = document.createElement('img');
       el.src = profile.picture+'?sz=80';
+      el.style.width='100%';
+      el.style.height='100%';
+      el.style.borderRadius='50%';
     } else {
       el = document.createElement('div');
       el.textContent = profile.email[0].toUpperCase();
-      el.style.background='#4CAF50';
-      el.style.color='white';
+      el.style.width='100%';
+      el.style.height='100%';
       el.style.display='flex';
       el.style.alignItems='center';
       el.style.justifyContent='center';
       el.style.fontWeight='bold';
       el.style.fontSize='20px';
+      el.style.background='#4CAF50';
+      el.style.color='white';
+      el.style.borderRadius='50%';
     }
 
-    el.style.width='100%';
-    el.style.height='100%';
-    el.style.borderRadius='50%';
-    el.style.cursor='pointer';
     userIcon.appendChild(el);
 
   }catch(e){
