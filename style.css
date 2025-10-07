@@ -16,9 +16,8 @@ header {
 
 .user-icon {
   position: absolute;
-  top: 50%;
-  right: 20px;
-  transform: translateY(-50%);
+  top: 10px;      /* jarak dari atas header */
+  right: 20px;    /* jarak dari kanan header */
   width: 40px;
   height: 40px;
   border-radius: 50%;
