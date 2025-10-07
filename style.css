@@ -10,14 +10,15 @@ header {
   background-color: #4CAF50;
   color: white;
   padding: 20px;
-  position: relative; /* supaya user-icon absolute bekerja */
+  position: relative; /* supaya user-icon bisa absolute di sini */
   text-align: center;
 }
 
 .user-icon {
   position: absolute;
-  top: 10px;      /* jarak dari atas header */
-  right: 20px;    /* jarak dari kanan header */
+  top: 50%; /* vertikal tengah header */
+  right: 20px; /* jarak dari kanan */
+  transform: translateY(-50%); /* center vertikal */
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -28,27 +29,14 @@ header {
   justify-content: center;
   font-size: 24px;
   cursor: pointer;
-  overflow: hidden;
+  overflow: hidden; /* supaya foto profil ga meluber */
 }
 
 .user-icon img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.user-icon div {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 20px;
-  background: #4CAF50;
-  color: white;
   border-radius: 50%;
+  object-fit: cover;
 }
 
 main {
