@@ -8,7 +8,6 @@ let pendingNote = null;
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
 const entriesList = document.getElementById('entriesList');
-const loginStatus = document.createElement('p'); // optional, bisa taruh di bawah form
 const userIcon = document.getElementById('userIcon');
 
 // -------------------- Google API Init --------------------
@@ -41,10 +40,19 @@ async function handleTokenResponse(resp) {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     });
     const profile = await profileRes.json();
-    userIcon.src = profile.picture; // ganti ikon jadi foto profil Google
+
+    // Ganti emoji dengan foto profil
+    userIcon.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = profile.picture;
+    img.style.width = '40px';
+    img.style.height = '40px';
+    img.style.borderRadius = '50%';
+    userIcon.appendChild(img);
+
   } catch (err) {
     console.log('Gagal ambil foto user:', err);
-    userIcon.src = 'https://via.placeholder.com/40/FFFFFF/000000?text=%21'; // fallback tanda seru
+    userIcon.textContent = '❗'; // fallback tanda seru
   }
 
   await savePendingNote();
@@ -126,8 +134,9 @@ logForm.addEventListener('submit', async (e)=>{
     pendingNote = text;
     tokenClient.requestAccessToken({ prompt: 'consent' });
 
-    // ubah ikon jadi tanda seru saat menunggu login
-    userIcon.src = 'https://via.placeholder.com/40/FFFFFF/000000?text=%21';
+    // ubah ikon sementara menjadi tanda seru
+    userIcon.textContent = '❗';
+    userIcon.innerHTML = '';
   }
 
   reflectionInput.value = '';
