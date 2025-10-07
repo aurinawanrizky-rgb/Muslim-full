@@ -1,4 +1,4 @@
-const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com';
+const CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let tokenClient;
@@ -60,17 +60,10 @@ async function updateUserIcon(){
     } else {
       el = document.createElement('div');
       el.textContent = profile.email[0].toUpperCase();
-      el.style.background='#4CAF50';
-      el.style.color='white';
-      el.style.display='flex';
-      el.style.alignItems='center';
-      el.style.justifyContent='center';
-      el.style.fontWeight='bold';
-      el.style.fontSize='20px';
     }
 
-    el.style.width='40px';
-    el.style.height='40px';
+    el.style.width='100%';
+    el.style.height='100%';
     el.style.borderRadius='50%';
     el.style.cursor='pointer';
     userIcon.appendChild(el);
