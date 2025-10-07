@@ -35,7 +35,6 @@ async function handleTokenResponse(resp) {
   if (resp.error) throw resp;
   accessToken = resp.access_token;
   localStorage.setItem('google_access_token', accessToken); // simpan token
-
   await fetchUserProfile();
   await listNotes();
 }
@@ -44,27 +43,26 @@ async function handleTokenResponse(resp) {
 async function fetchUserProfile() {
   if (!accessToken) return;
 
+  userIcon.innerHTML = ''; // reset dulu
+
   try {
     const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     });
     const profile = await profileRes.json();
+    console.log('User profile:', profile); // debug
 
-    userIcon.innerHTML = '';
     let iconEl;
 
     if(profile.picture){
       iconEl = document.createElement('img');
-      iconEl.src = profile.picture;
+      iconEl.src = profile.picture + '?sz=80';
+      iconEl.alt = profile.email[0].toUpperCase();
     } else {
-      // fallback: huruf awal email
       iconEl = document.createElement('div');
       iconEl.textContent = profile.email[0].toUpperCase();
       iconEl.style.background = '#4CAF50';
       iconEl.style.color = 'white';
-      iconEl.style.width = '40px';
-      iconEl.style.height = '40px';
-      iconEl.style.borderRadius = '50%';
       iconEl.style.display = 'flex';
       iconEl.style.alignItems = 'center';
       iconEl.style.justifyContent = 'center';
@@ -75,9 +73,11 @@ async function fetchUserProfile() {
     iconEl.style.width = '40px';
     iconEl.style.height = '40px';
     iconEl.style.borderRadius = '50%';
+    iconEl.style.cursor = 'pointer';
+
     userIcon.appendChild(iconEl);
 
-  } catch (err) {
+  } catch(err){
     console.log('Gagal ambil foto user:', err);
     userIcon.textContent = '❓';
   }
