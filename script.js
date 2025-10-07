@@ -5,16 +5,14 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let tokenClient;
 let accessToken = null;
+let pendingNote = null; // menyimpan note sementara saat login
 
-const loginButton = document.getElementById('loginGoogle');
-const loginStatus = document.getElementById('loginStatus');
-const logSection = document.querySelector('.log-section');
-const entriesSection = document.querySelector('.entries-section');
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
 const entriesList = document.getElementById('entriesList');
+const loginStatus = document.getElementById('loginStatus');
 
-// Load GAPI
+// -------------------- Google API Init --------------------
 function gapiLoaded() {
   gapi.load('client', initializeGapiClient);
 }
@@ -26,7 +24,6 @@ async function initializeGapiClient() {
   });
 }
 
-// Load GIS
 function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -35,27 +32,15 @@ function gisLoaded() {
   });
 }
 
-// Token callback
+// -------------------- Login callback --------------------
 async function handleTokenResponse(resp) {
   if (resp.error) throw resp;
   accessToken = resp.access_token;
   loginStatus.textContent = 'Login berhasil!';
-  logSection.style.display = 'block';
-  entriesSection.style.display = 'block';
-  await listNotes();
+  await savePendingNote();
 }
 
-// Tombol login
-loginButton.addEventListener('click', () => {
-  if (!tokenClient) return;
-  if (!accessToken) {
-    tokenClient.requestAccessToken({ prompt: 'consent' });
-  } else {
-    tokenClient.requestAccessToken({ prompt: '' });
-  }
-});
-
-// Buat folder di Drive jika belum ada
+// -------------------- Save note functions --------------------
 async function createOrGetFolder() {
   const folderName = 'MuslimFullNotes';
   const res = await gapi.client.drive.files.list({
@@ -76,7 +61,6 @@ async function createOrGetFolder() {
   }
 }
 
-// Simpan catatan ke Drive
 async function saveNoteToDrive(text) {
   const folderId = await createOrGetFolder();
   const blob = new Blob([text], { type: 'text/plain' });
@@ -98,7 +82,6 @@ async function saveNoteToDrive(text) {
   await listNotes();
 }
 
-// Ambil daftar catatan
 async function listNotes() {
   const folderId = await createOrGetFolder();
   const res = await gapi.client.drive.files.list({
@@ -121,16 +104,33 @@ async function listNotes() {
     });
 }
 
-// Form submit
+// -------------------- Form Submit --------------------
 logForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const text = reflectionInput.value.trim();
   if (!text) return;
-  await saveNoteToDrive(text);
-  reflectionInput.value='';
+
+  if (accessToken) {
+    // Sudah login → simpan langsung
+    await saveNoteToDrive(text);
+  } else {
+    // Belum login → simpan sementara, trigger login
+    pendingNote = text;
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  }
+
+  reflectionInput.value = '';
 });
 
-// Init
+// -------------------- Save pending note setelah login --------------------
+async function savePendingNote() {
+  if (pendingNote) {
+    await saveNoteToDrive(pendingNote);
+    pendingNote = null;
+  }
+}
+
+// -------------------- Init --------------------
 window.onload = () => {
   gapiLoaded();
   if (window.google && google.accounts) {
