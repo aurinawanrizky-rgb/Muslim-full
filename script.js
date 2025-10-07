@@ -3,6 +3,7 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let tokenClient;
 let accessToken = null;
+let profile = null;
 
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
@@ -10,9 +11,7 @@ const entriesList = document.getElementById('entriesList');
 const userIcon = document.getElementById('userIcon');
 
 // ---------------- Google API & GIS ----------------
-function gapiLoaded() { 
-  gapi.load('client', initializeGapiClient); 
-}
+function gapiLoaded() { gapi.load('client', initializeGapiClient); }
 
 async function initializeGapiClient() { 
   await gapi.client.init({ 
@@ -29,48 +28,49 @@ function gisLoaded() {
   });
 }
 
-// ---------------- Login callback ----------------
+// ---------------- Handle login ----------------
 async function handleTokenResponse(resp){
   if(resp.error) return;
   accessToken = resp.access_token;
   localStorage.setItem('google_access_token', accessToken);
 
-  await updateUserIcon();  // hanya update ikon, CSS tetap menangani posisi
+  await fetchProfile();
+  await updateUserIcon();
   await loadNotes();
 }
 
-// ---------------- Update user icon ----------------
-async function updateUserIcon(){
-  if(!userIcon) return;
-  userIcon.innerHTML = ''; // bersihkan isi ikon, tapi posisi CSS tetap
-
-  if(!accessToken){
-    userIcon.textContent = '❓';
-    return;
-  }
-
+// ---------------- Ambil profile ----------------
+async function fetchProfile(){
   try{
     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers:{ 'Authorization':'Bearer '+accessToken }
     });
-    const profile = await res.json();
-
-    if(profile.picture){
-      const img = document.createElement('img');
-      img.src = profile.picture+'?sz=80';
-      userIcon.appendChild(img);  // styling tetap dari CSS
-    } else {
-      const div = document.createElement('div');
-      div.textContent = profile.email[0].toUpperCase();
-      userIcon.appendChild(div);  // styling CSS tetap
-    }
+    profile = await res.json();
+    localStorage.setItem('google_profile', JSON.stringify(profile));
   }catch(e){
     console.log('Gagal ambil profil:', e);
-    userIcon.textContent='❓';
   }
 }
 
-// ---------------- Event klik ikon ----------------
+// ---------------- Update ikon ----------------
+function updateUserIcon(){
+  if(!userIcon) return;
+  userIcon.innerHTML = '';
+
+  if(profile?.picture){
+    const img = document.createElement('img');
+    img.src = profile.picture+'?sz=80';
+    userIcon.appendChild(img);
+  } else if(profile?.email){
+    const div = document.createElement('div');
+    div.textContent = profile.email[0].toUpperCase();
+    userIcon.appendChild(div);
+  } else {
+    userIcon.textContent = '❓';
+  }
+}
+
+// ---------------- Klik ikon ----------------
 userIcon.addEventListener('click', ()=>{
   if(!accessToken) tokenClient.requestAccessToken({prompt:'consent'});
 });
@@ -112,6 +112,7 @@ async function saveNote(text){
   await loadNotes();
 }
 
+// ---------------- Load catatan ----------------
 async function loadNotes(){
   if(!accessToken) return;
 
@@ -135,7 +136,7 @@ async function loadNotes(){
       });
       const text = await contentRes.text();
       const li = document.createElement('li');
-      li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`; // tanggal tetap muncul
+      li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
       entriesList.appendChild(li);
     }catch(e){ console.log(e); }
   }
@@ -154,10 +155,13 @@ logForm.addEventListener('submit', async e=>{
 window.onload=async()=>{
   gapiLoaded();
   if(window.google && google.accounts) gisLoaded();
+
   const savedToken = localStorage.getItem('google_access_token');
+  const savedProfile = localStorage.getItem('google_profile');
   if(savedToken){ 
-    accessToken=savedToken; 
-    await updateUserIcon(); 
-    await loadNotes(); 
+    accessToken = savedToken;
+    if(savedProfile) profile = JSON.parse(savedProfile);
+    await updateUserIcon();
+    await loadNotes();
   }
 };
