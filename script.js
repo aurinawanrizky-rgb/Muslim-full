@@ -4,7 +4,7 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let profile = null;
 let accessToken = null;
 let tokenClient = null;
-let folderIdCache = null;
+let folderId = null; // simpan folder id supaya ga cari terus
 
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
@@ -24,7 +24,7 @@ function parseJwt(token) {
 }
 
 // ---------------- Update ikon ----------------
-function updateUserIcon(){
+function updateUserIcon() {
   userIcon.innerHTML = '';
   if(profile?.picture){
     const img = document.createElement('img');
@@ -52,8 +52,8 @@ function gapiLoaded() {
   gapi.load('client', initGapiClient); 
 }
 
-async function initGapiClient(){
-  try{
+async function initGapiClient() {
+  try {
     await gapi.client.init({
       apiKey: '',
       discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
@@ -62,9 +62,30 @@ async function initGapiClient(){
     const savedToken = localStorage.getItem('google_access_token');
     if(savedToken){
       accessToken = savedToken;
-      loadNotes();
+      await ensureFolder();
     }
-  }catch(e){ console.log('GAPI init error', e); alert('⚠️ GAPI init error'); }
+  } catch(e) {
+    console.error('GAPI init error', e);
+    alert('⚠️ GAPI init error');
+  }
+}
+
+// ---------------- Token Client ----------------
+function gisLoaded() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp)=>{
+      if(resp.error){
+        console.error('Token error', resp);
+        alert('⚠️ Token error');
+        return;
+      }
+      accessToken = resp.access_token;
+      localStorage.setItem('google_access_token', accessToken);
+      await ensureFolder();
+    }
+  });
 }
 
 // ---------------- Klik ikon ----------------
@@ -76,65 +97,45 @@ userIcon.addEventListener('click', ()=>{
   }
 });
 
-// ---------------- Token Client ----------------
-function gisLoaded(){
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: async (resp)=>{
-      if(resp.error){
-        console.log('Token error', resp);
-        alert('⚠️ Token error');
-        return;
-      }
-      accessToken = resp.access_token;
-      localStorage.setItem('google_access_token', accessToken);
-      await loadNotes();
-    }
-  });
-}
-
-// ---------------- Folder ----------------
-async function getFolderId() {
-  if(folderIdCache) return folderIdCache;
-
+// ---------------- Pastikan folder ada ----------------
+async function ensureFolder() {
+  if(folderId) return folderId;
   try {
     const res = await gapi.client.drive.files.list({ 
-      q:"name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false", 
-      fields:'files(id)' 
+      q: "name='MuslimFullNotes' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+      fields:'files(id)'
     });
-
     if(res.result.files?.length){
-      folderIdCache = res.result.files[0].id;
-      return folderIdCache;
+      folderId = res.result.files[0].id;
+      await loadNotes();
+      return folderId;
     }
 
-    // Buat folder baru jika belum ada
-    const folder = await gapi.client.drive.files.create({ 
-      resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
-      fields:'id' 
+    // Folder belum ada → buat
+    const folder = await gapi.client.drive.files.create({
+      resource: { name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder' },
+      fields:'id'
     });
-    folderIdCache = folder.result.id;
-    return folderIdCache;
+    folderId = folder.result.id;
+    return folderId;
 
-  } catch(e){ 
-    console.log('Folder error', e);
-    alert('⚠️ Gagal akses folder di Google Drive');
-    return null;
+  } catch(e) {
+    console.error('Folder access/create error', e);
+    alert('⚠️ Gagal akses folder di Google Drive. Pastikan sudah login dan beri izin.');
   }
 }
 
-// ---------------- Save note ----------------
-async function saveNote(text){
+// ---------------- Simpan catatan ----------------
+async function saveNote(text) {
   if(!profile){ google.accounts.id.prompt(); return; }
   if(!accessToken){ tokenClient.requestAccessToken({prompt:'consent'}); return; }
 
-  try{
-    const folderId = await getFolderId();
-    if(!folderId) return;
+  try {
+    const folder = await ensureFolder();
+    if(!folder) return;
 
     const blob = new Blob([text], {type:'text/plain'});
-    const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folderId] };
+    const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folder] };
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
     form.append('file', blob);
@@ -147,23 +148,22 @@ async function saveNote(text){
 
     await loadNotes();
     alert('✅ Catatanmu berhasil tersimpan!');
-    
-  }catch(e){ 
-    console.log('Save note error', e); 
-    alert('⚠️ Gagal menyimpan catatan, coba lagi.');
+
+  } catch(e) {
+    console.error('Save note error', e);
+    alert('⚠️ Gagal menyimpan catatan');
   }
 }
 
-// ---------------- Load notes ----------------
-async function loadNotes(){
+// ---------------- Load catatan ----------------
+async function loadNotes() {
   if(!profile || !accessToken) return;
-
-  try{
-    const folderId = await getFolderId();
-    if(!folderId) return;
+  try {
+    const folder = await ensureFolder();
+    if(!folder) return;
 
     const res = await gapi.client.drive.files.list({
-      q:`'${folderId}' in parents and trashed=false`,
+      q:`'${folder}' in parents and trashed=false`,
       fields:'files(id,name,createdTime)'
     });
 
@@ -181,12 +181,17 @@ async function loadNotes(){
         });
         const text = await contentRes.text();
         const li = document.createElement('li');
-        li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text.substring(0,100)}${text.length>100?'...':''}`;
+        li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
         li.title = text;
         entriesList.appendChild(li);
-      }catch(e){ console.log('Load file error', e); alert('⚠️ Load file error'); }
+      } catch(e){
+        console.error('Load file error', e);
+      }
     }
-  }catch(e){ console.log('Load notes error', e); alert('⚠️ Load notes error'); }
+  } catch(e) {
+    console.error('Load notes error', e);
+    alert('⚠️ Gagal load catatan');
+  }
 }
 
 // ---------------- Form submit ----------------
@@ -198,7 +203,7 @@ logForm.addEventListener('submit', async e=>{
   reflectionInput.value='';
 });
 
-// ---------------- Tombol Catatan Sebelumnya ----------------
+// ---------------- Tombol catatan sebelumnya ----------------
 viewNotesBtn.addEventListener('click', async () => {
   if(!profile){ 
     google.accounts.id.prompt(); 
@@ -211,7 +216,6 @@ viewNotesBtn.addEventListener('click', async () => {
 
   logSection.style.display = 'none';
   entriesSection.style.display = 'block';
-
   await loadNotes();
 });
 
