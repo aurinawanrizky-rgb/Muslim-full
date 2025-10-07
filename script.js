@@ -1,4 +1,4 @@
-const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com';
+const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com'; // ganti dengan client ID-mu
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let tokenClient;
@@ -32,10 +32,7 @@ async function handleTokenResponse(resp){
   accessToken = resp.access_token;
   localStorage.setItem('google_access_token', accessToken);
 
-  // update ikon segera setelah login
   await updateUserIcon();
-
-  // load catatan
   await loadNotes();
 }
 
@@ -60,6 +57,13 @@ async function updateUserIcon(){
     } else {
       el = document.createElement('div');
       el.textContent = profile.email[0].toUpperCase();
+      el.style.background='#4CAF50';
+      el.style.color='white';
+      el.style.display='flex';
+      el.style.alignItems='center';
+      el.style.justifyContent='center';
+      el.style.fontWeight='bold';
+      el.style.fontSize='20px';
     }
 
     el.style.width='100%';
@@ -86,6 +90,7 @@ async function createFolder(){
     fields:'files(id)' 
   });
   if(res.result.files?.length) return res.result.files[0].id;
+
   const folder = await gapi.client.drive.files.create({ 
     resource:{name:'MuslimFullNotes', mimeType:'application/vnd.google-apps.folder'}, 
     fields:'id' 
@@ -95,22 +100,26 @@ async function createFolder(){
 
 async function saveNote(text){
   if(!accessToken){ tokenClient.requestAccessToken({prompt:'consent'}); return; }
+
   const folderId = await createFolder();
   const blob = new Blob([text],{type:'text/plain'});
   const metadata = { name:`note_${new Date().toISOString()}.txt`, parents:[folderId] };
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
   form.append('file', blob);
+
   await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
     method:'POST',
     headers:{'Authorization':'Bearer '+accessToken},
     body:form
   });
+
   await loadNotes();
 }
 
 async function loadNotes(){
   if(!accessToken) return;
+
   const folderId = await createFolder();
   const res = await gapi.client.drive.files.list({
     q:`'${folderId}' in parents and trashed=false`,
@@ -131,7 +140,7 @@ async function loadNotes(){
       });
       const text = await contentRes.text();
       const li = document.createElement('li');
-      li.textContent=`${new Date(file.createdTime).toLocaleString()} - ${text}`;
+      li.textContent=`${text}`;
       entriesList.appendChild(li);
     }catch(e){ console.log(e); }
   }
