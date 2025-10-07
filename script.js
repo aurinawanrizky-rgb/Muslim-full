@@ -10,7 +10,10 @@ const entriesList = document.getElementById('entriesList');
 const userIcon = document.getElementById('userIcon');
 
 // ---------------- Google API & GIS ----------------
-function gapiLoaded() { gapi.load('client', initializeGapiClient); }
+function gapiLoaded() { 
+  gapi.load('client', initializeGapiClient); 
+}
+
 async function initializeGapiClient() { 
   await gapi.client.init({ 
     apiKey:'', 
@@ -32,14 +35,14 @@ async function handleTokenResponse(resp){
   accessToken = resp.access_token;
   localStorage.setItem('google_access_token', accessToken);
 
-  await updateUserIcon();  // hanya update ikon, posisi CSS tetap
+  await updateUserIcon();  // hanya update ikon, CSS tetap menangani posisi
   await loadNotes();
 }
 
 // ---------------- Update user icon ----------------
 async function updateUserIcon(){
   if(!userIcon) return;
-  userIcon.innerHTML = ''; // bersihkan dulu isi ikon, tapi styling tetap CSS
+  userIcon.innerHTML = ''; // bersihkan isi ikon, tapi posisi CSS tetap
 
   if(!accessToken){
     userIcon.textContent = '❓';
@@ -52,30 +55,15 @@ async function updateUserIcon(){
     });
     const profile = await res.json();
 
-    let el;
     if(profile.picture){
-      el = document.createElement('img');
-      el.src = profile.picture+'?sz=80';
-      el.style.width='100%';
-      el.style.height='100%';
-      el.style.borderRadius='50%';
+      const img = document.createElement('img');
+      img.src = profile.picture+'?sz=80';
+      userIcon.appendChild(img);  // styling tetap dari CSS
     } else {
-      el = document.createElement('div');
-      el.textContent = profile.email[0].toUpperCase();
-      el.style.width='100%';
-      el.style.height='100%';
-      el.style.display='flex';
-      el.style.alignItems='center';
-      el.style.justifyContent='center';
-      el.style.fontWeight='bold';
-      el.style.fontSize='20px';
-      el.style.background='#4CAF50';
-      el.style.color='white';
-      el.style.borderRadius='50%';
+      const div = document.createElement('div');
+      div.textContent = profile.email[0].toUpperCase();
+      userIcon.appendChild(div);  // styling CSS tetap
     }
-
-    userIcon.appendChild(el);
-
   }catch(e){
     console.log('Gagal ambil profil:', e);
     userIcon.textContent='❓';
@@ -103,7 +91,10 @@ async function createFolder(){
 }
 
 async function saveNote(text){
-  if(!accessToken){ tokenClient.requestAccessToken({prompt:'consent'}); return; }
+  if(!accessToken){ 
+    tokenClient.requestAccessToken({prompt:'consent'}); 
+    return; 
+  }
 
   const folderId = await createFolder();
   const blob = new Blob([text],{type:'text/plain'});
@@ -144,7 +135,7 @@ async function loadNotes(){
       });
       const text = await contentRes.text();
       const li = document.createElement('li');
-      li.textContent=`${text}`;
+      li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`; // tanggal tetap muncul
       entriesList.appendChild(li);
     }catch(e){ console.log(e); }
   }
