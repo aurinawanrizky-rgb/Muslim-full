@@ -5,12 +5,13 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let tokenClient;
 let accessToken = null;
-let pendingNote = null; // menyimpan note sementara saat login
+let pendingNote = null;
 
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
 const entriesList = document.getElementById('entriesList');
 const loginStatus = document.getElementById('loginStatus');
+const userIcon = document.getElementById('userIcon');
 
 // -------------------- Google API Init --------------------
 function gapiLoaded() {
@@ -37,6 +38,18 @@ async function handleTokenResponse(resp) {
   if (resp.error) throw resp;
   accessToken = resp.access_token;
   loginStatus.textContent = 'Login berhasil!';
+
+  try {
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    const profile = await profileRes.json();
+    userIcon.src = profile.picture;
+  } catch (err) {
+    console.log('Gagal ambil foto user:', err);
+    userIcon.src = 'https://via.placeholder.com/40?text=!'; // fallback tanda seru
+  }
+
   await savePendingNote();
 }
 
@@ -111,12 +124,13 @@ logForm.addEventListener('submit', async (e)=>{
   if (!text) return;
 
   if (accessToken) {
-    // Sudah login → simpan langsung
     await saveNoteToDrive(text);
   } else {
-    // Belum login → simpan sementara, trigger login
     pendingNote = text;
     tokenClient.requestAccessToken({ prompt: 'consent' });
+
+    // ubah ikon jadi tanda seru saat menunggu login
+    userIcon.src = 'https://via.placeholder.com/40?text=!';
   }
 
   reflectionInput.value = '';
