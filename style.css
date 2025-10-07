@@ -50,6 +50,32 @@ main {
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
+/* Update: catatan sebelumnya scrollable & truncate */
+.entries-section {
+  display: none;      /* default hidden */
+  max-height: 400px;  /* tinggi maksimal area catatan */
+  overflow-y: auto;   /* scroll vertikal */
+}
+
+.entries-section li {
+  background: #fff;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  max-height: 60px;         /* tampil sebagian */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.entries-section li:hover {
+  max-height: none;
+  white-space: normal;
+  overflow: visible;
+}
+
 textarea {
   width: 100%;
   min-height: 80px;
