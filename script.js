@@ -40,7 +40,7 @@ async function handleTokenResponse(resp) {
   await listNotes();
 }
 
-// -------------------- Ambil profil user --------------------
+// -------------------- Ambil profil user + fallback --------------------
 async function fetchUserProfile() {
   if (!accessToken) return;
 
@@ -50,14 +50,33 @@ async function fetchUserProfile() {
     });
     const profile = await profileRes.json();
 
-    // tampilkan foto profil di ikon
     userIcon.innerHTML = '';
-    const img = document.createElement('img');
-    img.src = profile.picture;
-    img.style.width = '40px';
-    img.style.height = '40px';
-    img.style.borderRadius = '50%';
-    userIcon.appendChild(img);
+    let iconEl;
+
+    if(profile.picture){
+      iconEl = document.createElement('img');
+      iconEl.src = profile.picture;
+    } else {
+      // fallback: huruf awal email
+      iconEl = document.createElement('div');
+      iconEl.textContent = profile.email[0].toUpperCase();
+      iconEl.style.background = '#4CAF50';
+      iconEl.style.color = 'white';
+      iconEl.style.width = '40px';
+      iconEl.style.height = '40px';
+      iconEl.style.borderRadius = '50%';
+      iconEl.style.display = 'flex';
+      iconEl.style.alignItems = 'center';
+      iconEl.style.justifyContent = 'center';
+      iconEl.style.fontWeight = 'bold';
+      iconEl.style.fontSize = '20px';
+    }
+
+    iconEl.style.width = '40px';
+    iconEl.style.height = '40px';
+    iconEl.style.borderRadius = '50%';
+    userIcon.appendChild(iconEl);
+
   } catch (err) {
     console.log('Gagal ambil foto user:', err);
     userIcon.textContent = '❓';
