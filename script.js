@@ -1,4 +1,4 @@
-const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com';
+const CLIENT_ID = '544009583277-qd8po0m30sat4rnu83oitajs28n0g57h.apps.googleusercontent.com'; // ganti dengan client ID-mu
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let profile = null;
@@ -15,38 +15,16 @@ const backBtn = document.getElementById('backBtn');
 const logSection = document.querySelector('.log-section');
 const entriesSection = document.getElementById('entriesSection');
 
-// ---------------- Toast popup ----------------
-function showToast(message, type='info'){
-  const toast = document.createElement('div');
-  toast.textContent = message;
-  toast.style.position = 'fixed';
-  toast.style.top = '20px';
-  toast.style.right = '20px';
-  toast.style.padding = '10px 15px';
-  toast.style.backgroundColor = type === 'success' ? '#4CAF50' 
-                           : type === 'error' ? '#f44336' 
-                           : '#2196F3';
-  toast.style.color = 'white';
-  toast.style.borderRadius = '5px';
-  toast.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
-  toast.style.zIndex = 9999;
-  toast.style.opacity = '0';
-  toast.style.transition = 'opacity 0.3s';
-
-  document.body.appendChild(toast);
-  requestAnimationFrame(() => toast.style.opacity = '1');
-
-  setTimeout(()=>{
-    toast.style.opacity = '0';
-    setTimeout(()=> toast.remove(), 300);
-  }, 3000);
-}
-
 // ---------------- Parse JWT ----------------
 function parseJwt(token) {
   const base64Url = token.split('.')[1];
   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
   return JSON.parse(atob(base64));
+}
+
+// ---------------- Toast / popup ----------------
+function showToast(message, type='info'){
+  alert((type==='error'?'⚠️ ':'✅ ') + message);
 }
 
 // ---------------- Update ikon ----------------
@@ -70,7 +48,6 @@ function handleCredentialResponse(response){
   profile = parseJwt(response.credential);
   localStorage.setItem('google_profile', JSON.stringify(profile));
   updateUserIcon();
-  showToast('Login berhasil!', 'success');
   if(tokenClient) tokenClient.requestAccessToken({prompt:''});
 }
 
@@ -90,9 +67,10 @@ async function initGapiClient(){
     if(savedToken){
       accessToken = savedToken;
       await loadNotes();
-      showToast('Catatan dimuat dari Drive', 'info');
     }
-  }catch(e){ showToast('GAPI init error: '+e, 'error'); }
+  }catch(e){ 
+    showToast('GAPI init error: '+(e.message || JSON.stringify(e)), 'error'); 
+  }
 }
 
 // ---------------- Klik ikon ----------------
@@ -111,12 +89,11 @@ function gisLoaded(){
     scope: SCOPES,
     callback: async (resp)=>{
       if(resp.error){
-        showToast('Token error: '+resp.error, 'error');
+        showToast('Token error: '+(resp.error || JSON.stringify(resp)), 'error');
         return;
       }
       accessToken = resp.access_token;
       localStorage.setItem('google_access_token', accessToken);
-      showToast('Token berhasil diterima', 'success');
       await loadNotes();
     }
   });
@@ -136,7 +113,9 @@ async function createFolder(){
       fields:'id' 
     });
     return folder.result.id;
-  }catch(e){ showToast('Create folder error: '+e, 'error'); }
+  }catch(e){ 
+    showToast('Create folder error: '+(e.message || JSON.stringify(e)), 'error'); 
+  }
 }
 
 async function saveNote(text){
@@ -158,10 +137,11 @@ async function saveNote(text){
     });
 
     await loadNotes();
-    showToast('Catatan tersimpan!', 'success');
-    
+
+    showToast('Catatanmu berhasil tersimpan!');
+
   }catch(e){ 
-    showToast('Save note error: '+e, 'error'); 
+    showToast('Save note error: '+(e.message || JSON.stringify(e)), 'error');
   }
 }
 
@@ -191,11 +171,11 @@ async function loadNotes(){
         const text = await contentRes.text();
         const li = document.createElement('li');
         li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
-        li.title = text;
+        li.title = text; // tooltip full text
         entriesList.appendChild(li);
-      }catch(e){ showToast('Load file error: '+e, 'error'); }
+      }catch(e){ showToast('Load file error: '+(e.message || JSON.stringify(e)), 'error'); }
     }
-  }catch(e){ showToast('Load notes error: '+e, 'error'); }
+  }catch(e){ showToast('Load notes error: '+(e.message || JSON.stringify(e)), 'error'); }
 }
 
 // ---------------- Form submit ----------------
@@ -209,40 +189,4 @@ logForm.addEventListener('submit', async e=>{
 
 // ---------------- Tombol Catatan Sebelumnya ----------------
 viewNotesBtn.addEventListener('click', async () => {
-  if(!profile){ 
-    google.accounts.id.prompt(); 
-    return;
-  }
-  if(!accessToken){ 
-    tokenClient.requestAccessToken({prompt:'consent'}); 
-    return;
-  }
-
-  logSection.style.display = 'none';
-  entriesSection.style.display = 'block';
-
-  await loadNotes();
-});
-
-backBtn.addEventListener('click', () => {
-  entriesSection.style.display = 'none';
-  logSection.style.display = 'block';
-});
-
-// ---------------- On load ----------------
-window.onload = ()=>{
-  const savedProfile = localStorage.getItem('google_profile');
-  if(savedProfile){
-    profile = JSON.parse(savedProfile);
-    updateUserIcon();
-    gapiLoaded();
-  }
-
-  google.accounts.id.initialize({
-    client_id: CLIENT_ID,
-    callback: handleCredentialResponse
-  });
-  google.accounts.id.renderButton(document.createElement('div'), { theme:'outline', size:'small' });
-
-  gisLoaded();
-};
+  if(!profile){
