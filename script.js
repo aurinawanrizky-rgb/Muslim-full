@@ -3,6 +3,7 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 let profile = null;
 let accessToken = null;
+let tokenClient = null;
 
 const logForm = document.getElementById('logForm');
 const reflectionInput = document.getElementById('reflection');
@@ -37,7 +38,8 @@ function handleCredentialResponse(response){
   profile = parseJwt(response.credential);
   localStorage.setItem('google_profile', JSON.stringify(profile));
   updateUserIcon();
-  initGapiClient();
+  // Ambil token Drive setelah profile siap
+  if(tokenClient) tokenClient.requestAccessToken({prompt: ''});
 }
 
 // ---------------- Load GAPI ----------------
@@ -47,19 +49,37 @@ function gapiLoaded() {
 
 async function initGapiClient(){
   await gapi.client.init({
-    apiKey: '', // optional, bisa kosong
+    apiKey: '',
     discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
   });
-  accessToken = localStorage.getItem('google_access_token'); 
-  loadNotes();
+  const savedToken = localStorage.getItem('google_access_token');
+  if(savedToken){
+    accessToken = savedToken;
+    loadNotes();
+  }
 }
 
 // ---------------- Klik ikon ----------------
 userIcon.addEventListener('click', ()=>{
   if(!profile){
     google.accounts.id.prompt(); // popup login
+  } else if(!accessToken){
+    tokenClient.requestAccessToken({prompt:'consent'});
   }
 });
+
+// ---------------- Token Client ----------------
+function gisLoaded(){
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: (resp)=>{
+      accessToken = resp.access_token;
+      localStorage.setItem('google_access_token', accessToken);
+      loadNotes();
+    }
+  });
+}
 
 // ---------------- Drive ----------------
 async function createFolder(){ 
@@ -77,10 +97,8 @@ async function createFolder(){
 }
 
 async function saveNote(text){
-  if(!profile) {
-    google.accounts.id.prompt();
-    return;
-  }
+  if(!profile) { google.accounts.id.prompt(); return; }
+  if(!accessToken) { tokenClient.requestAccessToken({prompt:'consent'}); return; }
 
   const folderId = await createFolder();
   const blob = new Blob([text], {type:'text/plain'});
@@ -100,7 +118,8 @@ async function saveNote(text){
 
 // ---------------- Load catatan ----------------
 async function loadNotes(){
-  if(!profile) return;
+  if(!profile || !accessToken) return;
+
   const folderId = await createFolder();
   const res = await gapi.client.drive.files.list({
     q:`'${folderId}' in parents and trashed=false`,
@@ -122,6 +141,7 @@ async function loadNotes(){
       const text = await contentRes.text();
       const li = document.createElement('li');
       li.textContent = `${new Date(file.createdTime).toLocaleString()} - ${text}`;
+      li.title = text; // hover untuk lihat full note
       entriesList.appendChild(li);
     }catch(e){ console.log(e); }
   }
@@ -149,8 +169,7 @@ window.onload = ()=>{
     client_id: CLIENT_ID,
     callback: handleCredentialResponse
   });
-  google.accounts.id.renderButton(
-    document.createElement('div'), // tidak tampil, kita pakai prompt manual
-    { theme: 'outline', size: 'small' }
-  );
+  google.accounts.id.renderButton(document.createElement('div'), { theme:'outline', size:'small' });
+
+  gisLoaded();
 };
